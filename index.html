@@ -371,6 +371,21 @@ html[dir=rtl] .prog-arrow { transform: scaleX(-1); }
 .stat-val { font-size: 22px; font-weight: 600; color: var(--text); }
 .stat-val .cur { font-size: 11px; font-weight: 400; color: var(--faint); margin-inline-end: 3px; }
 .stat-card.total { border-color: var(--emerald-b); background: #f0fdf4; }
+.stat-card.pen-card { position: relative; }
+.pen-edit-btn { position:absolute; top:8px; inset-inline-end:8px; background:none; border:1px solid var(--border); border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:12px; line-height:1; }
+.pen-edit-btn:hover { background:#f1f5f9; }
+.pen-badge { display:none; font-size:10px; color:#b45309; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:1px 6px; margin-top:4px; width:fit-content; }
+.pen-panel { display:none; background:var(--card); border:1px solid #fde68a; border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow); }
+.pen-panel-title { font-size:12px; font-weight:600; color:#92400e; margin-bottom:10px; }
+.pen-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.pen-row label { font-size:12px; min-width:90px; color:var(--muted); }
+.pen-row input { flex:1; max-width:160px; padding:7px 10px; border:1px solid var(--border); border-radius:8px; font-size:13px; font-family:inherit; }
+.pen-row .pen-cur { font-size:11px; color:var(--faint); }
+.pen-actions { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+.pen-actions button { border:none; border-radius:8px; padding:7px 14px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
+.pen-apply { background:var(--emerald); color:#fff; }
+.pen-reset { background:#fffbeb; color:#92400e; border:1px solid #fde68a !important; }
+.pen-cancel { background:#f1f5f9; color:var(--muted); }
 .stat-card.total .stat-val { color: var(--emerald-d); }
 
 .quote-card {
@@ -1183,9 +1198,11 @@ html[dir=rtl] .sd-search {
       <div class="output-panel">
 
         <div id="breakdownStrip" style="display:none;" class="stats-strip">
-          <div class="stat-card">
+          <div class="stat-card pen-card">
+            <button class="pen-edit-btn" onclick="togglePenEdit()" title="Edit penalty / تعديل الرسوم">✏️</button>
             <div class="stat-lbl"><span data-ar>رسوم الطيران</span><span data-en>Airline Fees</span></div>
             <div class="stat-val" id="bdAirline">—</div>
+            <div class="pen-badge" id="penBadge"><span data-ar>معدّلة يدوياً</span><span data-en>Manually edited</span></div>
           </div>
           <div class="stat-card">
             <div class="stat-lbl"><span data-ar>فارق السعر</span><span data-en>Fare Difference</span></div>
@@ -1198,6 +1215,16 @@ html[dir=rtl] .sd-search {
           <div class="stat-card total">
             <div class="stat-lbl"><span data-ar>الإجمالي</span><span data-en>Total</span></div>
             <div class="stat-val" id="bdTotal">—</div>
+          </div>
+        </div>
+
+        <div id="penEditPanel" class="pen-panel">
+          <div class="pen-panel-title">✏️ <span data-ar>تعديل رسوم شركة الطيران (للفرد الواحد)</span><span data-en>Edit airline penalty (per passenger)</span></div>
+          <div id="penEditRows"></div>
+          <div class="pen-actions">
+            <button class="pen-apply" onclick="applyPenEdit()"><span data-ar>تطبيق</span><span data-en>Apply</span></button>
+            <button class="pen-reset" onclick="resetPenEdit()"><span data-ar>رجوع لقيمة الماسك</span><span data-en>Reset to mask value</span></button>
+            <button class="pen-cancel" onclick="closePenEdit()"><span data-ar>إلغاء</span><span data-en>Cancel</span></button>
           </div>
         </div>
 
@@ -2194,10 +2221,15 @@ function checkCurrency(){
   const isDom = _selectedFlightType === 'domestic';
   const { fee, baseFee } = getMosFee(pocKey, isDom);
   const isSarDom = (pocKey === 'SAR' && isDom);
+  _penOverride = null;
   finalize(fee, baseFee, isSarDom);
 }
 
+let _penOverride = null;      // {A,C,I} per-pax penalty in POC currency, or null
+let _lastFinalizeArgs = null;
+
 function finalize(mosFee, baseFee, isDomestic){
+  _lastFinalizeArgs = [mosFee, baseFee, isDomestic];
   const pocKey = _pocCur || _maskCur || cur;
   const pocCfg = POC_FEES[pocKey] || {dp:0};
   const dp     = pocCfg.dp;
@@ -2215,7 +2247,14 @@ function finalize(mosFee, baseFee, isDomestic){
         cI  = clean(document.getElementById('cI').value);
   const vA  = parseMCombined('maskA','maskA2'), vC = parseMCombined('maskC','maskC2'), vI = parseMCombined('maskI','maskI2');
 
-  const tP = cvt(vA.p * cA) + cvt(vC.p * cC) + cvt(vI.p * cI);
+  const origPA = cA > 0 ? cvt(vA.p) : 0, origPC = cC > 0 ? cvt(vC.p) : 0, origPI = cI > 0 ? cvt(vI.p) : 0;
+  const origTP = cvt(vA.p * cA) + cvt(vC.p * cC) + cvt(vI.p * cI);
+  const ov = _penOverride;
+  const pA = (ov && ov.A !== null && ov.A !== undefined) ? ov.A : origPA;
+  const pC = (ov && ov.C !== null && ov.C !== undefined) ? ov.C : origPC;
+  const pI = (ov && ov.I !== null && ov.I !== undefined) ? ov.I : origPI;
+  const tP = ov ? (pA * cA + pC * cC + pI * cI) : origTP;
+  const penDelta = ov ? (tP - origTP) : 0;
   const fdA = (vA.tot - vA.p) + vA.mk;
   const fdC = (vC.tot - vC.p) + vC.mk;
   const fdI = (vI.tot - vI.p) + vI.mk;
@@ -2227,11 +2266,11 @@ function finalize(mosFee, baseFee, isDomestic){
 
   const maskGrandTotal = (vA.tot + vA.mk) * cA + (vC.tot + vC.mk) * cC + (vI.tot + vI.mk) * cI;
   const convertedTotal = needsFx ? convertByBsr(maskGrandTotal, pocKey) : roundAsFare(maskGrandTotal, pocKey);
-  const grand = roundAsFare(convertedTotal + totalMos, pocKey);
+  const grand = roundAsFare(convertedTotal + penDelta + totalMos, pocKey);
 
-  const indA = roundAsFare(cvt(vA.p) + cvt(fdA) + effectiveMosPerPax, pocKey);
-  const indC = roundAsFare(cvt(vC.p) + cvt(fdC) + effectiveMosPerPax, pocKey);
-  const indI = roundAsFare(cvt(vI.p) + cvt(fdI), pocKey);
+  const indA = roundAsFare((ov ? pA : cvt(vA.p)) + cvt(fdA) + effectiveMosPerPax, pocKey);
+  const indC = roundAsFare((ov ? pC : cvt(vC.p)) + cvt(fdC) + effectiveMosPerPax, pocKey);
+  const indI = roundAsFare((ov ? pI : cvt(vI.p)) + cvt(fdI), pocKey);
   const pPer = (cA + cC + cI) > 0 ? roundAsFare(grand / (cA + cC + cI), pocKey) : 0;
 
   const peBalance = parseFareBalanceCombined();
@@ -2249,7 +2288,8 @@ function finalize(mosFee, baseFee, isDomestic){
     maskCur:_maskCur, pocCur:pocKey,
     peCur:pocKey, fdCur:pocKey,
     fareBalance:peBalance,
-    fx
+    fx,
+    pA, pC, pI, penDelta, penOverride: ov ? {A:ov.A, C:ov.C, I:ov.I} : null
   };
 
   cur = pocKey;
@@ -2265,6 +2305,36 @@ function finalize(mosFee, baseFee, isDomestic){
   document.getElementById('actionPanel').style.display = 'flex';
   setStep(4);
   processAll();
+}
+
+/* ══ Penalty edit ══ */
+function togglePenEdit(){
+  const panel = document.getElementById('penEditPanel');
+  if(panel.style.display === 'block'){ closePenEdit(); return; }
+  if(!d || !d.grand){ return; }
+  const rows = [];
+  const mk = (key, arLbl, enLbl, cnt, val) => cnt > 0 ? `<div class="pen-row">
+      <label><span data-ar>${arLbl} ×${cnt}</span><span data-en>${enLbl} ×${cnt}</span></label>
+      <input type="number" step="any" inputmode="decimal" id="penIn_${key}" value="${val}">
+      <span class="pen-cur">${d.pocCur || d.currency}</span></div>` : '';
+  rows.push(mk('A','بالغ','Adult', d.cA, d.pA));
+  rows.push(mk('C','طفل','Child', d.cC, d.pC));
+  rows.push(mk('I','رضيع','Infant', d.cI, d.pI));
+  document.getElementById('penEditRows').innerHTML = rows.join('');
+  panel.style.display = 'block';
+  applyLangVisibility();
+}
+function closePenEdit(){ document.getElementById('penEditPanel').style.display = 'none'; }
+function applyPenEdit(){
+  const rd = (k) => { const el = document.getElementById('penIn_'+k); if(!el) return null; const v = parseFloat(el.value); return isNaN(v) ? null : Math.max(0, v); };
+  _penOverride = { A: rd('A'), C: rd('C'), I: rd('I') };
+  closePenEdit();
+  if(_lastFinalizeArgs) finalize(..._lastFinalizeArgs);
+}
+function resetPenEdit(){
+  _penOverride = null;
+  closePenEdit();
+  if(_lastFinalizeArgs) finalize(..._lastFinalizeArgs);
 }
 
 function parseFareBalance(id){
@@ -2315,8 +2385,9 @@ function renderGdsBreakdown(){
   const newTaxVal      = fb && fb.newTax      !== null ? conv(fb.newTax,      peCur) : null;
   const taxBalVal      = fb && fb.taxBalance  !== null ? conv(fb.taxBalance,  peCur) : 0;
   const ticketDiffVal  = fb && fb.ticketDiff  !== null ? conv(fb.ticketDiff,  fdCur) : fareBalanceVal;
-  const penaltyVal     = fb && fb.penalty     !== null ? conv(fb.penalty,     peCur) : d.tP;
-  const grandTotalVal  = fb && fb.grandTotal  !== null ? conv(fb.grandTotal,  pocCur): (d.tP + d.totalFD);
+  const _po = !!d.penOverride;
+  const penaltyVal     = _po ? d.tP : (fb && fb.penalty     !== null ? conv(fb.penalty,     peCur) : d.tP);
+  const grandTotalVal  = fb && fb.grandTotal  !== null ? (conv(fb.grandTotal,  pocCur) + (d.penDelta || 0)) : (d.tP + d.totalFD);
   const paymentCur     = (fx !== 1) ? pocCur : ((fb && fb.paymentCur) || peCur);
   const paxForMos      = d.paxForMos || 1;
 
@@ -2465,6 +2536,7 @@ function renderOutput(){
   const strip = document.getElementById('breakdownStrip');
   strip.style.display = 'grid';
   document.getElementById('bdAirline').innerHTML = `<span class="cur">${peCur} </span>${fmtAmt(d.tP, peCur)}`;
+  const _pb = document.getElementById('penBadge'); if(_pb){ _pb.style.display = d.penOverride ? 'block' : 'none'; }
   document.getElementById('bdFare').innerHTML    = `<span class="cur">${fdCur} </span>${fmtAmt(d.totalFD, fdCur)}`;
   document.getElementById('bdMos').innerHTML     = `<span class="cur">${pocCur} </span>${fmtAmt(d.totalMos, pocCur)}`;
   document.getElementById('bdTotal').innerHTML   = `<span class="cur">${pocCur} </span>${fmtAmt(d.grand, pocCur)}`;
@@ -2783,6 +2855,8 @@ function draftRestore() {
     try {
       const restored = JSON.parse(draft.computedD);
       Object.assign(d, restored);
+      _penOverride = restored.penOverride || null;
+      const _pb2 = document.getElementById('penBadge'); if(_pb2) _pb2.style.display = restored.penOverride ? 'block' : 'none';
       document.getElementById('msgPlaceholder').style.display = 'none';
       document.getElementById('msgOutputSplit').style.display = 'block';
       if (draft.msgArText) document.getElementById('msgOutputAr').innerText = draft.msgArText;
