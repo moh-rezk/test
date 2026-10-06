@@ -1086,6 +1086,13 @@ html[dir=rtl] .sd-search {
 #lccHost .lcc-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 14px;min-height:44px;background:#fff;border-bottom:1px solid var(--border);box-shadow:var(--shadow);}
 #lccHost .lcc-bar-title{font-size:12px;font-weight:700;color:var(--muted);}
 #lccFrame{flex:1;width:100%;border:0;background:#fff;}
+
+/* per-flight passenger settings */
+.pf-tabs{display:flex;gap:8px;}
+.pf-tab{flex:1;padding:10px 8px;border-radius:10px;border:1.5px solid var(--border-s);background:#f8fafc;color:var(--muted);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:.15s;text-align:center;}
+.pf-tab.on{background:var(--emerald);border-color:var(--emerald);color:#fff;}
+.pf-tab small{display:block;font-size:9px;font-weight:600;opacity:.85;margin-top:2px;}
+.pf-note{font-size:10px;color:var(--faint);margin-top:8px;line-height:1.6;}
 </style>
 </head>
 <body>
@@ -1241,11 +1248,11 @@ html[dir=rtl] .sd-search {
                     <span data-en>Amount payable on the Portal</span>
                   </div>
                   <div style="font-size:10px;color:var(--muted);margin-bottom:6px;">
-                    <span data-ar>إجمالي كل المسافرين (POC)</span>
-                    <span data-en>All passengers total (POC)</span>
+                    <span data-ar>إجمالي كل المسافرين (POC) — مطلوب (اكتب 0 لو مفيش)</span>
+                    <span data-en>All passengers total (POC) — required (enter 0 if none)</span>
                   </div>
                   <input type="number" step="any" inputmode="decimal" id="lccAmt" class="ip-input"
-                    placeholder="0.00"
+                    placeholder="* 0.00"
                     style="font-size:18px;font-weight:700;font-family:'IBM Plex Mono',monospace;text-align:center;border-color:var(--emerald-b);background:var(--emerald-x);"
                     oninput="draftSchedule&&draftSchedule()">
                   <!-- 4% VAT toggle -->
@@ -1527,6 +1534,14 @@ html[dir=rtl] .sd-search {
       <button class="modal-close" onclick="document.getElementById('paxModal').style.display='none'">✕</button>
     </div>
     <div class="modal-body">
+      <div id="pfTabsSection" class="modal-section" style="display:none;">
+        <div class="modal-section-lbl"><span data-ar>إعدادات كل رحلة</span><span data-en>Per-flight settings</span></div>
+        <div class="pf-tabs">
+          <button type="button" class="pf-tab on" id="pfTabOut" onclick="pfSwitch('out')"><span data-ar>✈️ الذهاب</span><span data-en>✈️ Outbound</span><small id="pfTabOutSub"></small></button>
+          <button type="button" class="pf-tab" id="pfTabRet" onclick="pfSwitch('ret')"><span data-ar>🔁 العودة</span><span data-en>🔁 Return</span><small id="pfTabRetSub"></small></button>
+        </div>
+        <div class="pf-note"><span data-ar>لكل رحلة: عدد الركاب (بالغ/طفل/رضيع) + تعديل الغرامة + وقت النو شو. بدّل بين التبويبين وعدّل اللي محتاجه.</span><span data-en>Per flight: passenger counts (ADT/CHD/INF) + penalty edit + no-show window. Switch tabs and edit what you need.</span></div>
+      </div>
       <div id="paxAirlineSummary" class="modal-section" style="display:none;">
         <div class="modal-section-lbl"><span data-ar>بيانات الرحلة المكتشفة</span><span data-en>Detected Flight Info</span></div>
         <div class="airline-summary">
@@ -1538,7 +1553,7 @@ html[dir=rtl] .sd-search {
           <div id="paxFlightTypeBadge" class="ft-badge"></div>
         </div>
       </div>
-      <div class="modal-section">
+      <div class="modal-section" id="gdsNoShowSection">
         <div class="modal-section-lbl"><span data-ar>وقت النو شو</span><span data-en>No-Show Window</span><span id="gdsNoShowTag" style="display:none;"> — GDS</span></div>
         <div class="noshow-row">
           <div id="noShowRuleNote" class="noshow-rule-note"></div>
@@ -1589,12 +1604,12 @@ html[dir=rtl] .sd-search {
       </div>
       <div id="paxPenSection" class="modal-section">
         <div class="modal-section-lbl"><span data-ar>✏️ تعديل الغرامة لكل راكب (اختياري)</span><span data-en>✏️ Edit penalty per passenger (optional)</span></div>
-        <div style="font-size:11px;font-weight:700;color:var(--emerald-d);margin:2px 0 6px;">GDS</div>
+        <div id="pmGdsLbl" style="font-size:11px;font-weight:700;color:var(--emerald-d);margin:2px 0 6px;">GDS</div>
           <div class="pen-row" id="pmRow_G_A"><label><span data-ar>بالغ</span><span data-en>Adult</span></label><input type="number" step="any" inputmode="decimal" id="pmG_A" placeholder="—"><span class="pen-cur">POC</span></div>
           <div class="pen-row" id="pmRow_G_C"><label><span data-ar>طفل</span><span data-en>Child</span></label><input type="number" step="any" inputmode="decimal" id="pmG_C" placeholder="—"><span class="pen-cur">POC</span></div>
           <div class="pen-row" id="pmRow_G_I"><label><span data-ar>رضيع</span><span data-en>Infant</span></label><input type="number" step="any" inputmode="decimal" id="pmG_I" placeholder="—"><span class="pen-cur">POC</span></div>
         <div id="paxPenLccWrap" style="display:none;">
-          <div style="font-size:11px;font-weight:700;color:#b45309;margin:10px 0 6px;"><span data-ar>LCC ⚠️ مطلوب — غرامة كل مسافر (مبلغ الـ Portal النهائي، شامل الـ 4% لو مفعّلة)</span><span data-en>LCC ⚠️ Required — penalty per passenger (final Portal amount, incl. 4% if enabled)</span></div>
+          <div style="font-size:11px;font-weight:700;color:#b45309;margin:10px 0 6px;"><span data-ar>LCC ⚠️ مطلوب — غرامة كل مسافر (مبلغ الـ Portal النهائي، شامل الـ 4% لو مفعّلة) — اكتب 0 لو مفيش</span><span data-en>LCC ⚠️ Required — penalty per passenger (final Portal amount, incl. 4% if enabled) — enter 0 if none</span></div>
           <div class="pen-row" id="pmRow_L_A"><label><span data-ar>بالغ</span><span data-en>Adult</span></label><input type="number" step="any" inputmode="decimal" id="pmL_A" placeholder="*" oninput="this.classList.remove('pen-req-bad')" required><span class="pen-cur">POC</span></div>
           <div class="pen-row" id="pmRow_L_C"><label><span data-ar>طفل</span><span data-en>Child</span></label><input type="number" step="any" inputmode="decimal" id="pmL_C" placeholder="*" oninput="this.classList.remove('pen-req-bad')" required><span class="pen-cur">POC</span></div>
           <div class="pen-row" id="pmRow_L_I"><label><span data-ar>رضيع</span><span data-en>Infant</span></label><input type="number" step="any" inputmode="decimal" id="pmL_I" placeholder="*" oninput="this.classList.remove('pen-req-bad')" required><span class="pen-cur">POC</span></div>
@@ -2182,6 +2197,7 @@ function openPaxModal(){
   buildPocGrid(_maskCur);
   updateFxRateSection();
   clearPaxPenInputs();
+  pfInit();
   document.getElementById('paxModal').style.display='flex';
 }
 
@@ -2202,6 +2218,7 @@ function parseM(id){
    original parseM('maskA')/parseFareBalance('maskA') calls returned, so
    nothing changes for the existing single-booking flow. */
 let _multiBooking = false;
+let _flightCfg = null, _pfActive = 'out';   // per-flight passenger settings (only when separate bookings is ON)
 
 let _secondType = 'gds';
 function setSecondType(t){
@@ -2499,6 +2516,7 @@ function onFxRateInput() {
 }
 
 function checkCurrency(){
+  if(pfEnabled()) pfReadInputs(_pfActive);
   if(!validateLccPaxPen()) return;
   const aMask = document.getElementById('maskA').value;
   const m = aMask.match(/PENALTY\s+([A-Z]{3})\s+/i);
@@ -2518,6 +2536,7 @@ function checkCurrency(){
 
 function validateLccPaxPen(){
   if(!isMixLcc()) return true;
+  if(pfEnabled()) return pfValidateLcc();
   const cnt={A:clean(document.getElementById('cA')?.value||'0'),C:clean(document.getElementById('cC')?.value||'0'),I:clean(document.getElementById('cI')?.value||'0')};
   const nm={A:['بالغ','Adult'],C:['طفل','Child'],I:['رضيع','Infant']};
   const miss=[];
@@ -2525,14 +2544,28 @@ function validateLccPaxPen(){
   const box=document.getElementById('lccPenReqErr');
   if(box){ if(miss.length){box.style.display='block'; box.textContent=uiLang==='ar'?('⚠️ أدخل غرامة LCC لكل مسافر: '+miss.join('، ')):('⚠️ Enter the LCC penalty for every passenger: '+miss.join(', '));} else {box.style.display='none'; box.textContent='';} }
   if(miss.length){ const f=document.querySelector('#paxPenLccWrap .pen-req-bad'); if(f){try{f.scrollIntoView({behavior:'smooth',block:'center'});f.focus({preventScroll:true});}catch(e){}} return false; }
+  const _pv = {}; ['A','C','I'].forEach(t=>{ const e=document.getElementById('pmL_'+t); _pv[t]=e&&e.value.trim()!==''?parseFloat(e.value):0; });
+  return lccTotalVsPenOk(cnt,_pv);
+}
+function lccTotalVsPenOk(n, pen){
+  const lcc = getLccMix(); if(!lcc) return true;
+  const penTot = ['A','C','I'].reduce((t,k)=>t+(pen[k]||0)*(n[k]||0),0);
+  const box = document.getElementById('lccPenReqErr');
+  if(lcc.pen - penTot < -0.01){
+    if(box){ box.style.display='block'; box.textContent = uiLang==='ar' ? `⚠️ إجمالي رسوم الـ LCC (${lcc.pen.toFixed(2)}) أقل من مجموع الغرامة (${penTot.toFixed(2)}) — راجع الإجمالي أو الغرامة.` : `⚠️ LCC total (${lcc.pen.toFixed(2)}) is less than the penalty total (${penTot.toFixed(2)}) — check the total or the penalty.`; }
+    return false;
+  }
+  if(box){ box.style.display='none'; box.textContent=''; }
   return true;
 }
 let _lccPenOverride = null;   // {A,C,I} per-pax LCC penalty (final, POC), or null
 function togglePaxPenRows(){
   const n = id => clean(document.getElementById(id)?.value || '0');
   const cnt = {A:n('cA'), C:n('cC'), I:n('cI')};
-  ['G','L'].forEach(b => ['A','C','I'].forEach(t => { const r = document.getElementById('pmRow_'+b+'_'+t); if(r) r.style.display = cnt[t] > 0 ? 'flex' : 'none'; }));
-  const w = document.getElementById('paxPenLccWrap'); if(w) w.style.display = isMixLcc() ? 'block' : 'none';
+  const _pf = pfEnabled(), _isL = _pf && pfSrc(_pfActive) === 'lcc';
+  ['G','L'].forEach(b => ['A','C','I'].forEach(t => { const r = document.getElementById('pmRow_'+b+'_'+t); const hide = _pf && ((b==='G' && _isL) || (b==='L' && !_isL)); if(r) r.style.display = (cnt[t] > 0 && !hide) ? 'flex' : 'none'; }));
+  const w = document.getElementById('paxPenLccWrap'); if(w) w.style.display = (isMixLcc() && (!_pf || _isL)) ? 'block' : 'none';
+  const _gl = document.getElementById('pmGdsLbl'); if(_gl) _gl.style.display = (_pf && _isL) ? 'none' : '';
 }
 function clearPaxPenInputs(){
   ['A','C','I'].forEach(t=>document.getElementById('pmL_'+t)?.classList.remove('pen-req-bad'));
@@ -2541,6 +2574,7 @@ function clearPaxPenInputs(){
   togglePaxPenRows();
 }
 function readPaxPenInputs(){
+  if(pfEnabled()){ pfApplyLegacy(); return; }
   const rd = id => { const el = document.getElementById(id); if(!el || el.value.trim() === '') return null; const v = parseFloat(el.value); return isNaN(v) ? null : Math.max(0, v); };
   const mk = b => { const o = {A:rd('pm'+b+'_A'), C:rd('pm'+b+'_C'), I:rd('pm'+b+'_I')}; return (o.A===null && o.C===null && o.I===null) ? null : o; };
   _penOverride = mk('G');
@@ -2549,8 +2583,213 @@ function readPaxPenInputs(){
 let _penOverride = null;      // {A,C,I} per-pax penalty in POC currency, or null
 let _lastFinalizeArgs = null;
 
+/* ══════════ PER-FLIGHT PASSENGER SETTINGS (⚙️ لكل رحلة) ══════════
+   Active only when "separate bookings" is ON. Each flight (outbound / return) keeps its own:
+   passenger counts, penalty override, no-show window.
+   - Equal counts (and, for GDS+GDS, no overrides / same hours) → the original calculation path runs unchanged.
+   - Different counts (or GDS+GDS per-flight overrides/hours) → finalizePF() computes each flight separately. */
+const PF_KEYS = ['A','C','I'];
+function pfEl(id){ return document.getElementById(id); }
+function legPlan(){
+  const lcc = getLccMix();
+  if(lcc) return lcc.leg === 'out' ? [{key:'out',src:'lcc'},{key:'ret',src:'g1'}] : [{key:'out',src:'g1'},{key:'ret',src:'lcc'}];
+  return [{key:'out',src:'g1'},{key:'ret',src:'g2'}];
+}
+function pfEnabled(){ return !!(_multiBooking && _flightCfg); }
+function pfSrc(key){ const p = legPlan().find(x => x.key === key); return p ? p.src : 'g1'; }
+function pfSplitIndex(segs){
+  const mk = (dn,mo,t) => { const m = MONTHS_NUM[(mo||'').toUpperCase()]; return m===undefined ? NaN : new Date(_guessYear(m),m,+dn,+(t||'').slice(0,2),+(t||'').slice(2,4)).getTime(); };
+  let k = Math.ceil(segs.length/2), best = -Infinity;
+  if(segs.length > 2) for(let i=1;i<segs.length;i++){ const g = mk(segs[i].dayNum,segs[i].monthAb,segs[i].depTime) - mk(segs[i-1].arrDayNum,segs[i-1].arrMonthAb,segs[i-1].arrTime); if(g > best){ best = g; k = i; } }
+  if(_legSplit > 0 && _legSplit < segs.length) k = _legSplit;
+  return k;
+}
+function pfLegSegs(key){
+  const gds = getGdsSegsRaw(), lcc = getLccSegs();
+  if(pfSrc(key) === 'lcc') return lcc;
+  if(getLccMix()) return gds;
+  const k = pfSplitIndex(gds);
+  return key === 'out' ? gds.slice(0,k) : gds.slice(k);
+}
+function pfAirName(B, lang){ const s = pfLegSegs(B.dir)[0]; const code = s && s.airCode; return code ? formatAirline(code, lang) : B.t; }
+function bkAirName(B, lang){ return (d && d.pf) ? pfAirName(B, lang) : bookingAirlineName(B.t, lang); }
+function pfPaxLine(cnt, lang){
+  const p = [];
+  if(cnt.A > 0) p.push(lang==='ar' ? `بالغ ×${cnt.A}` : `Adult ×${cnt.A}`);
+  if(cnt.C > 0) p.push(lang==='ar' ? `طفل ×${cnt.C}` : `Child ×${cnt.C}`);
+  if(cnt.I > 0) p.push(lang==='ar' ? `رضيع ×${cnt.I}` : `Infant ×${cnt.I}`);
+  return (lang==='ar' ? 'عدد المسافرين: ' : 'Passengers: ') + p.join(' | ') + '\n';
+}
+function pfReadInputs(key){
+  if(!_flightCfg || !_flightCfg[key]) return;
+  const c = _flightCfg[key], src = pfSrc(key), b = src === 'lcc' ? 'L' : 'G';
+  c.cA = clean(pfEl('cA').value); c.cC = clean(pfEl('cC').value); c.cI = clean(pfEl('cI').value);
+  const rd = id => { const e = pfEl(id); if(!e || e.value.trim() === '') return null; const v = parseFloat(e.value); return isNaN(v) ? null : Math.max(0, v); };
+  const o = {A:rd('pm'+b+'_A'), C:rd('pm'+b+'_C'), I:rd('pm'+b+'_I')};
+  c.pen = (o.A===null && o.C===null && o.I===null) ? null : o;
+  const h = pfEl(src === 'lcc' ? 'noShowHrLcc' : 'noShowHr'); c.hrs = h ? h.value : '';
+}
+function pfLoadInputs(key){
+  const c = _flightCfg[key], src = pfSrc(key), b = src === 'lcc' ? 'L' : 'G', isL = src === 'lcc';
+  pfEl('cA').value = c.cA; pfEl('cC').value = c.cC; pfEl('cI').value = c.cI;
+  ['G','L'].forEach(x => PF_KEYS.forEach(k => { const e = pfEl('pm'+x+'_'+k); if(e){ e.value = ''; e.classList.remove('pen-req-bad'); } }));
+  PF_KEYS.forEach(k => { const e = pfEl('pm'+b+'_'+k); if(e && c.pen && c.pen[k] != null) e.value = c.pen[k]; });
+  const gs = pfEl('gdsNoShowSection'), ls = pfEl('lccNoShowSection');
+  if(gs) gs.style.display = isL ? 'none' : '';
+  if(ls) ls.style.display = (isL && isMixLcc()) ? '' : 'none';
+  const hi = pfEl(isL ? 'noShowHrLcc' : 'noShowHr'); if(hi) hi.value = c.hrs;
+  const er = pfEl('lccPenReqErr'); if(er){ er.style.display = 'none'; er.textContent = ''; }
+  togglePaxPenRows();
+}
+function pfStyleTabs(){
+  ['out','ret'].forEach(k => { const t = pfEl(k === 'out' ? 'pfTabOut' : 'pfTabRet'); if(t) t.classList.toggle('on', k === _pfActive); });
+}
+function pfLabelTabs(){
+  legPlan().forEach(P => {
+    const s = pfLegSegs(P.key)[0], code = s && s.airCode;
+    const el = pfEl(P.key === 'out' ? 'pfTabOutSub' : 'pfTabRetSub');
+    if(el) el.textContent = (P.src === 'lcc' ? 'LCC' : 'GDS') + (code ? ' · ' + code : '');
+  });
+}
+function pfSwitch(key){
+  if(!pfEnabled() || key === _pfActive) return;
+  pfReadInputs(_pfActive); _pfActive = key; pfLoadInputs(key); pfStyleTabs();
+}
+function pfInit(){
+  const sec = pfEl('pfTabsSection');
+  if(!_multiBooking){
+    _flightCfg = null; if(sec) sec.style.display = 'none';
+    const gs = pfEl('gdsNoShowSection'); if(gs) gs.style.display = '';
+    return;
+  }
+  const keep = _flightCfg;
+  const cnt0 = {A:clean(pfEl('cA').value), C:clean(pfEl('cC').value), I:clean(pfEl('cI').value)};
+  const hG = pfEl('noShowHr').value, hL = ((pfEl('noShowHrLcc')||{}).value) || hG;
+  _flightCfg = {};
+  legPlan().forEach(P => {
+    const k0 = keep && keep[P.key];
+    _flightCfg[P.key] = {cA:k0?k0.cA:cnt0.A, cC:k0?k0.cC:cnt0.C, cI:k0?k0.cI:cnt0.I, pen:null, hrs:P.src==='lcc'?hL:hG};
+  });
+  _pfActive = 'out';
+  if(sec) sec.style.display = 'block';
+  pfLoadInputs('out'); pfLabelTabs(); pfStyleTabs();
+  if(typeof applyLangVisibility === 'function') applyLangVisibility();
+}
+function pfValidateLcc(){
+  const box = pfEl('lccPenReqErr');
+  const leg = legPlan().find(p => p.src === 'lcc'); if(!leg) return true;
+  const c = _flightCfg[leg.key];
+  const nm = {A:['بالغ','Adult'], C:['طفل','Child'], I:['رضيع','Infant']};
+  const cnt = {A:c.cA, C:c.cC, I:c.cI}, miss = [];
+  PF_KEYS.forEach(k => { if(cnt[k] > 0 && (!c.pen || c.pen[k] == null)) miss.push(k); });
+  if(!miss.length){ if(box){ box.style.display = 'none'; box.textContent = ''; } if(!lccTotalVsPenOk(cnt, c.pen || {})){ if(_pfActive !== leg.key) pfSwitch(leg.key); return false; } return true; }
+  if(_pfActive !== leg.key) pfSwitch(leg.key);
+  miss.forEach(k => { const e = pfEl('pmL_'+k); if(e) e.classList.add('pen-req-bad'); });
+  const names = miss.map(k => nm[k][uiLang==='ar'?0:1]);
+  if(box){ box.style.display = 'block'; box.textContent = uiLang==='ar' ? ('⚠️ أدخل غرامة LCC لكل مسافر (' + (leg.key==='out'?'الذهاب':'العودة') + '): ' + names.join('، ')) : ('⚠️ Enter the LCC penalty for every passenger (' + (leg.key==='out'?'Outbound':'Return') + '): ' + names.join(', ')); }
+  const f = document.querySelector('#paxPenLccWrap .pen-req-bad'); if(f){ try{ f.scrollIntoView({behavior:'smooth',block:'center'}); f.focus({preventScroll:true}); }catch(e){} }
+  return false;
+}
+/* map per-flight settings → the legacy globals used by the equal-counts path */
+function pfApplyLegacy(){
+  _penOverride = null; _lccPenOverride = null;
+  const o = _flightCfg.out;
+  pfEl('cA').value = o.cA; pfEl('cC').value = o.cC; pfEl('cI').value = o.cI;
+  legPlan().forEach(P => {
+    const c = _flightCfg[P.key];
+    if(P.src === 'lcc'){ _lccPenOverride = c.pen; const e = pfEl('noShowHrLcc'); if(e) e.value = c.hrs; }
+    else if(P.src === 'g1'){ _penOverride = c.pen; pfEl('noShowHr').value = c.hrs; }
+  });
+}
+function pfNeeded(){
+  if(!pfEnabled()) return false;
+  const o = _flightCfg.out, r = _flightCfg.ret;
+  if(!o || !r) return false;
+  if(o.cA !== r.cA || o.cC !== r.cC || o.cI !== r.cI) return true;
+  if(!isMixLcc()){ if(o.pen || r.pen) return true; if(String(o.hrs) !== String(r.hrs)) return true; }
+  return false;
+}
+function finalizePF(mosFee, baseFee, isDomestic){
+  const pocKey = _pocCur || _maskCur || cur;
+  const pocCfg = POC_FEES[pocKey] || {dp:0}, dp = pocCfg.dp;
+  const needsFx = _fxRate && _maskCur !== pocKey;
+  const cvt = a => needsFx ? convertByBsr(a, pocKey) : roundAsFare(a, pocKey);
+  const mosFeeRounded = roundAsFare(mosFee, pocKey);
+  const lcc = getLccMix();
+  const maskIds = {g1:{A:'maskA',C:'maskC',I:'maskI'}, g2:{A:'maskA2',C:'maskC2',I:'maskI2'}};
+  const F = legPlan().map(P => {
+    const c = _flightCfg[P.key];
+    const n = {A:c.cA, C:c.cC, I:c.cI}, paxN = n.A + n.C + n.I;
+    const pen = {A:0,C:0,I:0}, orig = {A:0,C:0,I:0}, fd = {A:0,C:0,I:0}, fdT = {A:0,C:0,I:0};
+    if(P.src === 'lcc'){
+      const lp = lcc ? roundAsFare(lcc.pen, pocKey) : 0, lf = lcc ? roundAsFare(lcc.fd, pocKey) : 0;
+      const per = paxN > 0 ? lp / paxN : 0;
+      PF_KEYS.forEach(k => { orig[k] = per; pen[k] = (c.pen && c.pen[k] != null) ? c.pen[k] : per; });
+      const penT = PF_KEYS.reduce((t,k) => t + pen[k] * n[k], 0);
+      const fper = paxN > 0 ? (lp + lf - penT) / paxN : 0;   // fare difference = LCC total − penalty total
+      PF_KEYS.forEach(k => { fd[k] = fper; fdT[k] = fper * n[k]; });
+    } else {
+      PF_KEYS.forEach(k => {
+        const v = parseM(maskIds[P.src][k]);
+        const base = n[k] > 0 ? cvt(v.p) : 0; orig[k] = base;
+        pen[k] = (c.pen && c.pen[k] != null) ? c.pen[k] : base;
+        const f = (v.tot - v.p) + v.mk;
+        fd[k] = n[k] > 0 ? cvt(f) : 0; fdT[k] = n[k] > 0 ? cvt(f * n[k]) : 0;
+      });
+    }
+    const sum = (o, m) => PF_KEYS.reduce((t,k) => t + o[k] * m[k], 0);
+    return {P, c, n, paxN, pen, orig, fd, fdT, penTot:sum(pen,n), origTot:(P.src==='lcc' ? sum(pen,n) : sum(orig,n)), fdTot:PF_KEYS.reduce((t,k) => t + fdT[k], 0)};
+  });
+  const tP = F.reduce((t,f) => t + f.penTot, 0), origTP = F.reduce((t,f) => t + f.origTot, 0), totalFD = F.reduce((t,f) => t + f.fdTot, 0);
+  /* Almosafer fee: once per distinct passenger → the larger adult+child count of the two flights (same 4-pax cap) */
+  const paxForMos = Math.max(...F.map(f => f.n.A + f.n.C));
+  const totalMos = roundAsFare(paxForMos >= 4 ? mosFeeRounded * 4 : mosFeeRounded * paxForMos, pocKey);
+  const effMos = paxForMos > 0 ? totalMos / paxForMos : mosFeeRounded;
+  const grand = roundAsFare(tP + totalFD + totalMos, pocKey);
+  const cMax = {A:Math.max(...F.map(f=>f.n.A)), C:Math.max(...F.map(f=>f.n.C)), I:Math.max(...F.map(f=>f.n.I))};
+  const indOf = k => roundAsFare(F.reduce((t,f) => t + (f.n[k] > 0 ? f.pen[k] + f.fd[k] : 0), 0) + (k !== 'I' ? effMos : 0), pocKey);
+  const maxPax = Math.max(...F.map(f => f.paxN));
+  const pPer = maxPax > 0 ? roundAsFare(grand / maxPax, pocKey) : 0;
+  const lccF = F.find(f => f.P.src === 'lcc');
+  const fx = needsFx ? _fxRate : 1;
+  const bk = F.map(f => ({t:f.P.src==='lcc'?'LCC':'GDS', dir:f.P.key, hrs:f.c.hrs, cnt:f.n, pen:f.pen, fd:f.fd, mos:{A:0,C:0,I:0}, total:f.penTot + f.fdTot}));
+  const legs = F.map(f => f.P.src === 'lcc' ? {t:'LCC', pen:f.penTot, fd:f.fdTot} : {t:'GDS', pen:f.penTot, fd:f.fdTot});
+  const anyG = F.some(f => f.P.src !== 'lcc' && f.c.pen), anyL = F.some(f => f.P.src === 'lcc' && f.c.pen);
+
+  d = {
+    tP, totalFD, tM:0, totalMos, grand,
+    currency:pocKey, hrs:F[0].c.hrs, hrsLcc:lccF ? lccF.c.hrs : F[0].c.hrs,
+    cA:cMax.A, cC:cMax.C, cI:cMax.I,
+    mosFee:mosFeeRounded, baseFee, isDomestic,
+    indA:indOf('A'), indC:indOf('C'), indI:indOf('I'), pPer,
+    paxForMos, effectiveMosPerPax:effMos, mosCapped: paxForMos >= 4,
+    dp, maskCur:_maskCur, pocCur:pocKey, peCur:pocKey, fdCur:pocKey,
+    fareBalance:null, fx,
+    lccMix: lccF ? {pen:lccF.penTot, fd:lccF.fdTot, tot:lccF.penTot + lccF.fdTot, leg:lcc.leg} : null,
+    legs, bk, pf:true,
+    pA:F[0].pen.A, pC:F[0].pen.C, pI:F[0].pen.I, penDelta:tP - origTP,
+    penOverride: anyG ? {A:null,C:null,I:null} : null,
+    lccPenOverride: anyL ? {A:null,C:null,I:null} : null, lPA:0, lPC:0, lPI:0
+  };
+
+  cur = pocKey;
+  document.getElementById('curDisplay').innerText = cur;
+  renderOutput();
+  renderGdsBreakdown();
+  renderLegsCard();
+  document.getElementById('internalPreview').style.display = 'block';
+  setTimeout(draftSave, 200);
+  const fxNote = fx !== 1 ? ` [×${fx} ${_maskCur}→${pocKey}]` : '';
+  document.getElementById('breakdownText').innerHTML =
+    `PE: ${fmtAmt(tP,pocKey)} ${pocKey} | FD: ${fmtAmt(totalFD,pocKey)} ${pocKey} | ALM: ${fmtAmt(totalMos,pocKey)} ${pocKey} | TOTAL: ${fmtAmt(grand,pocKey)} ${pocKey}${fxNote}`;
+  document.getElementById('actionPanel').style.display = 'flex';
+  setStep(4);
+  processAll();
+}
+
 function finalize(mosFee, baseFee, isDomestic){
   _lastFinalizeArgs = [mosFee, baseFee, isDomestic];
+  if(pfNeeded()) return finalizePF(mosFee, baseFee, isDomestic);
   const pocKey = _pocCur || _maskCur || cur;
   const pocCfg = POC_FEES[pocKey] || {dp:0};
   const dp     = pocCfg.dp;
@@ -2578,11 +2817,13 @@ function finalize(mosFee, baseFee, isDomestic){
   const lccPer = (lcc && _payPax > 0) ? lccTot / _payPax : 0;
   const lov = (lcc && _lccPenOverride) ? _lccPenOverride : null;
   const lccPenPer = (lcc && _payPax > 0) ? lccPen / _payPax : 0;
-  const lccFdPer  = (lcc && _payPax > 0) ? lccFd  / _payPax : 0;
   const lA = (lov && lov.A != null) ? lov.A : lccPenPer;
   const lC = (lov && lov.C != null) ? lov.C : lccPenPer;
   const lI = (lov && lov.I != null) ? lov.I : lccPenPer;
   const lccPenEff = lov ? (lA * cA + lC * cC + lI * cI) : lccPen;
+  /* LCC split: entered total (all pax) = per-pax penalty × count + fare difference */
+  const lccFdEff = lov ? (lccPen + lccFd - lccPenEff) : lccFd;
+  const lccFdPer = (lcc && _payPax > 0) ? lccFdEff / _payPax : 0;
   const origTP = cvt(vA.p * cA) + cvt(vC.p * cC) + cvt(vI.p * cI) + lccPen;
   const ov = _penOverride;
   const pA = (ov && ov.A !== null && ov.A !== undefined) ? ov.A : origPA;
@@ -2594,7 +2835,8 @@ function finalize(mosFee, baseFee, isDomestic){
   const fdA = (vA.tot - vA.p) + vA.mk;
   const fdC = (vC.tot - vC.p) + vC.mk;
   const fdI = (vI.tot - vI.p) + vI.mk;
-  const totalFD = cvt(fdA * cA) + cvt(fdC * cC) + cvt(fdI * cI) + lccFd;
+  const totalFD = cvt(fdA * cA) + cvt(fdC * cC) + cvt(fdI * cI) + lccFdEff;
+  const penDeltaD = penDelta - (lov ? (lccPenEff - lccPen) : 0);   // manual GDS adjustment only (LCC shift is absorbed by the fare difference)
 
   const paxForMos = cA + cC;
   const totalMos  = roundAsFare((paxForMos >= 4 ? mosFeeRounded * 4 : mosFeeRounded * paxForMos), pocKey);
@@ -2602,7 +2844,7 @@ function finalize(mosFee, baseFee, isDomestic){
 
   const maskGrandTotal = (vA.tot + vA.mk) * cA + (vC.tot + vC.mk) * cC + (vI.tot + vI.mk) * cI;
   const convertedTotal = needsFx ? convertByBsr(maskGrandTotal, pocKey) : roundAsFare(maskGrandTotal, pocKey);
-  const grand = roundAsFare(convertedTotal + lccTot + penDelta + totalMos, pocKey);
+  const grand = roundAsFare(convertedTotal + lccTot + penDeltaD + totalMos, pocKey);
 
   const indA = roundAsFare((ov ? pA : cvt(vA.p)) + cvt(fdA) + lccFdPer + lA + effectiveMosPerPax, pocKey);
   const indC = roundAsFare((ov ? pC : cvt(vC.p)) + cvt(fdC) + lccFdPer + lC + effectiveMosPerPax, pocKey);
@@ -2611,9 +2853,9 @@ function finalize(mosFee, baseFee, isDomestic){
 
   let legs = null;
   if(_multiBooking){
-    const gdsPen = tP - lccPenEff, gdsFd = totalFD - lccFd;
+    const gdsPen = tP - lccPenEff, gdsFd = totalFD - lccFdEff;
     if(lcc){
-      const g = {t:'GDS', pen:gdsPen, fd:gdsFd}, l = {t:'LCC', pen:lccPenEff, fd:0, single:true};
+      const g = {t:'GDS', pen:gdsPen, fd:gdsFd}, l = {t:'LCC', pen:lccPenEff, fd:lccFdEff};
       legs = lcc.leg==='out' ? [l,g] : [g,l];
     } else {
       const n = [cA,cC,cI]; let bp = 0, bf = 0;
@@ -2638,7 +2880,7 @@ function finalize(mosFee, baseFee, isDomestic){
     peCur:pocKey, fdCur:pocKey,
     fareBalance:peBalance,
     fx,
-    lccMix: lcc ? {pen:lccPenEff, fd:lccFd, tot:lccPenEff+lccFd, leg:lcc.leg} : null,
+    lccMix: lcc ? {pen:lccPenEff, fd:lccFdEff, tot:lccPenEff+lccFdEff, leg:lcc.leg} : null,
     legs,
     bk: lcc ? (function(){
       const gB = {t:'GDS', hrs:nHr, pen:{A:pA,C:pC,I:pI}, fd:{A:cvt(fdA),C:cvt(fdC),I:cvt(fdI)}};
@@ -2648,7 +2890,7 @@ function finalize(mosFee, baseFee, isDomestic){
         B.total = ['A','C','I'].reduce((t,k)=>t+(B.pen[k]+B.fd[k])*({A:cA,C:cC,I:cI})[k],0) + (i===0 ? totalMos : 0); });
       return arr;
     })() : null,
-    pA, pC, pI, penDelta, penOverride: ov ? {A:ov.A, C:ov.C, I:ov.I} : null,
+    pA, pC, pI, penDelta:penDeltaD, penOverride: ov ? {A:ov.A, C:ov.C, I:ov.I} : null,
     lccPenOverride: lov ? {A:lov.A, C:lov.C, I:lov.I} : null, lPA:lA, lPC:lC, lPI:lI
   };
 
@@ -2673,6 +2915,19 @@ function togglePenEdit(){
   const panel = document.getElementById('penEditPanel');
   if(panel.style.display === 'block'){ closePenEdit(); return; }
   if(!d || !d.grand){ return; }
+  if(d.pf && d.bk){
+    const rowsPf = [];
+    d.bk.forEach(B => {
+      rowsPf.push(`<div style="font-size:11px;font-weight:700;color:#92400e;margin:6px 0;">${B.dir==='out'?'✈️ الذهاب / Outbound':'🔁 العودة / Return'} (${B.t})</div>`);
+      [['A','بالغ','Adult'],['C','طفل','Child'],['I','رضيع','Infant']].forEach(([k,ar,en]) => {
+        if(B.cnt[k] > 0) rowsPf.push(`<div class="pen-row"><label><span data-ar>${ar} ×${B.cnt[k]}</span><span data-en>${en} ×${B.cnt[k]}</span></label><input type="number" step="any" inputmode="decimal" id="penIn_${B.dir}_${k}" value="${Math.round(B.pen[k]*100)/100}"><span class="pen-cur">${d.pocCur || d.currency}</span></div>`);
+      });
+    });
+    document.getElementById('penEditRows').innerHTML = rowsPf.join('');
+    panel.style.display = 'block';
+    applyLangVisibility();
+    return;
+  }
   const rows = [];
   const mk = (key, arLbl, enLbl, cnt, val) => cnt > 0 ? `<div class="pen-row">
       <label><span data-ar>${arLbl} ×${cnt}</span><span data-en>${enLbl} ×${cnt}</span></label>
@@ -2694,6 +2949,16 @@ function togglePenEdit(){
 }
 function closePenEdit(){ document.getElementById('penEditPanel').style.display = 'none'; }
 function applyPenEdit(){
+  if(d && d.pf && _flightCfg){
+    ['out','ret'].forEach(dir => {
+      const o = {A:null,C:null,I:null};
+      PF_KEYS.forEach(k => { const el = document.getElementById('penIn_'+dir+'_'+k); if(el){ const v = parseFloat(el.value); o[k] = isNaN(v) ? null : Math.max(0, v); } });
+      _flightCfg[dir].pen = (o.A===null && o.C===null && o.I===null) ? null : o;
+    });
+    closePenEdit();
+    if(_lastFinalizeArgs) finalize(..._lastFinalizeArgs);
+    return;
+  }
   const rd = (k) => { const el = document.getElementById('penIn_'+k); if(!el) return null; const v = parseFloat(el.value); return isNaN(v) ? null : Math.max(0, v); };
   _penOverride = { A: rd('A'), C: rd('C'), I: rd('I') };
   _lccPenOverride = d.lccMix ? { A: rd('L_A'), C: rd('L_C'), I: rd('L_I') } : null;
@@ -2702,6 +2967,7 @@ function applyPenEdit(){
 }
 function resetPenEdit(){
   _penOverride = null; _lccPenOverride = null;
+  if(_flightCfg){ ['out','ret'].forEach(k => { if(_flightCfg[k]) _flightCfg[k].pen = null; }); }
   closePenEdit();
   if(_lastFinalizeArgs) finalize(..._lastFinalizeArgs);
 }
@@ -2883,8 +3149,11 @@ function renderLegsCard(){
   const panel = (ar,en,ss,L) => `<div class="lg-book ${L&&L.t==='LCC'?'lccb':'gdsb'}"><div class="lg-bhd"><span class="lg-dir">${B(ar,en)}</span>${L?`<span class="lg-badge ${L.t.toLowerCase()}">${L.t}</span>`:''}</div>${ss.map(fcard).join('') || '<div class="lg-city">—</div>'}${feeBox(L)}</div>`;
   const L = d.legs;
   const hrs = parseFloat(d.hrs);
+  const _pfNs = !!(d.pf && d.bk);
+  const _nsAr = _pfNs ? 'وقت النو شو — ' + d.bk.map(b => (b.dir==='out'?'الذهاب':'العودة') + ': ' + b.hrs + ' ساعة').join(' | ') + ' قبل الإقلاع' : 'وقت النو شو: ' + hrs + ' ساعة قبل الإقلاع';
+  const _nsEn = _pfNs ? 'No-show window — ' + d.bk.map(b => (b.dir==='out'?'Outbound':'Return') + ': ' + b.hrs + ' hr(s)').join(' | ') + ' before departure' : 'No-show window: ' + hrs + ' hour(s) before departure';
   let h = '';
-  if(!isNaN(hrs) && hrs > 0) h += `<div class="lg-noshow"><span class="ns-ico">⛔</span><div>${B('تحذير No-Show — انتبه لوقت النو شو','No-Show warning — mind the no-show window')}<small>${B('وقت النو شو: '+hrs+' ساعة قبل الإقلاع','No-show window: '+hrs+' hour(s) before departure')}</small></div></div>`;
+  if((!isNaN(hrs) && hrs > 0) || (_pfNs && d.bk.some(b => parseFloat(b.hrs) > 0))) h += `<div class="lg-noshow"><span class="ns-ico">⛔</span><div>${B('تحذير No-Show — انتبه لوقت النو شو','No-Show warning — mind the no-show window')}<small>${B(_nsAr,_nsEn)}</small></div></div>`;
   h += `<div class="lg-top">🧭 ${B('تفاصيل الرحلات والرسوم','Itinerary &amp; Fees')}`;
   if(segs.length > 2) h += `<select onchange="_legSplit=+this.value;renderLegsCard()">${segs.slice(1).map((_,i)=>`<option value="${i+1}"${i+1===k?' selected':''}>${i+1} | ${segs.length-i-1}</option>`).join('')}</select>`;
   h += `</div><div class="lg-grid">${panel('✈️ الذهاب','✈️ Outbound',outS,L&&L[0])}${(retS.length||L)?panel('🔁 العودة','🔁 Return',retS,L&&L[1]):''}</div>`;
@@ -2936,7 +3205,7 @@ function renderGdsBreakdown(){
   const _po = !!(d.penOverride || d.lccPenOverride);
   const penaltyVal     = _po ? d.tP : (fb && fb.penalty     !== null ? conv(fb.penalty,     peCur) : d.tP);
   const _lm = d.lccMix;
-  const grandTotalVal  = _lm ? (d.tP + d.totalFD) : fb && fb.grandTotal  !== null ? (conv(fb.grandTotal,  pocCur) + (d.penDelta || 0)) : (d.tP + d.totalFD);
+  const grandTotalVal  = (_lm || d.pf) ? (d.tP + d.totalFD) : fb && fb.grandTotal  !== null ? (conv(fb.grandTotal,  pocCur) + (d.penDelta || 0)) : (d.tP + d.totalFD);
   const paymentCur     = (fx !== 1) ? pocCur : ((fb && fb.paymentCur) || peCur);
   const paxForMos      = d.paxForMos || 1;
 
@@ -2959,7 +3228,7 @@ function renderGdsBreakdown(){
   if(newTaxVal !== null) html += row('NEW TAX',          peCur, newTaxVal);
   html += row('TAX BALANCE',        peCur,  taxBalVal);
   html += row('TICKET DIFFERENCE',  fdCur,  ticketDiffVal, 'divider');
-  html += row('PENALTY',            peCur,  _po || _lm ? d.tP : penaltyVal);
+  html += row('PENALTY',            peCur,  _po || _lm || d.pf ? d.tP : penaltyVal);
   if(_lm) html += `<div class="gds-row" style="background:#eff6ff;"><span class="gds-label" style="color:#1d4ed8;font-size:10px;">+ LCC (${_lm.leg==='out'?'OUTBOUND':'RETURN'}) PORTAL AMOUNT</span><span class="gds-cur">${pocCur}</span><span class="gds-amount">${fmtAmt(_lm.tot,pocCur)}</span></div>`;
   html += row('GRAND TOTAL',        pocCur, grandTotalVal, 'total-row');
   html += `<div class="gds-row" style="background:#fffbeb;border-top:1px solid #fde68a;">
@@ -3056,19 +3325,21 @@ function renderOutput(){
   /* ── LCC-mixed: one block per booking in the new format ── */
   let bkAr = '', bkEn = '';
   if(d.bk){
-    const cnt = {A:d.cA, C:d.cC, I:d.cI};
+    const cnt0 = {A:d.cA, C:d.cC, I:d.cI};
     const lblAr = {A:'للبالغ', C:'للطفل', I:'للرضيع'}, lblEn = {A:'adult', C:'child', I:'infant'};
-    const multi = ['A','C','I'].filter(k=>cnt[k]>0).length > 1;
+    const multi = ['A','C','I'].filter(k=>cnt0[k]>0).length > 1;
     const hw = (h)=>{ const n=parseFloat(h)||0; return {ar:`${h} ${hrWordAr(n)}`, en:`${h} ${hrWordEn(n)}`}; };
     const blocks = d.bk.map(B=>{
+      const cnt = B.cnt || cnt0;
       const dirAr = B.dir==='out' ? 'الذهاب' : 'العودة', dirEn = B.dir==='out' ? 'Outbound' : 'Return';
-      let ar = `*${dirAr} (${bookingAirlineName(B.t,'ar')})*\n`, en = `*${dirEn} (${bookingAirlineName(B.t,'en')})*\n`;
+      let ar = `*${dirAr} (${bkAirName(B,'ar')})*\n`, en = `*${dirEn} (${bkAirName(B,'en')})*\n`;
+      if(d.pf){ ar += pfPaxLine(cnt,'ar'); en += pfPaxLine(cnt,'en'); }
       ['A','C','I'].forEach(k=>{
         if(!(cnt[k]>0)) return;
-        const pen=B.pen[k], fd=B.fd[k], mos=B.mos[k], tot=roundAsFare(pen+fd+mos, pocCur);
+        const pen=B.pen[k], fd=B.fd[k], mos=B.mos[k], tot=roundAsFare(pen+fd, pocCur);
         ar += `رسوم التعديل لشركة الطيران: ${fmtAmt(pen,pocCur)} ${curAr} للمسافر (إجمالي: ${fmtAmt(pen*cnt[k],pocCur)} ${curAr}).\n`;
         en += `Airline amendment fee: ${fmtAmt(pen,pocCur)} ${pocCur} per passenger (total: ${fmtAmt(pen*cnt[k],pocCur)} ${pocCur}).\n`;
-        if(B.t!=='LCC' || fd>0){
+        if(true){
           ar += `فارق السعر للمسافر الواحد: ${fmtAmt(fd,pocCur)} ${curAr}.\n`;
           en += `Fare difference per passenger: ${fmtAmt(fd,pocCur)} ${pocCur}.\n`;
         }
@@ -3079,20 +3350,24 @@ function renderOutput(){
         ar += `إجمالي الرسوم ${lblAr[k]}: ${fmtAmt(tot,pocCur)} ${curAr}.\n`;
         en += `Total fees per ${lblEn[k]}: ${fmtAmt(tot,pocCur)} ${pocCur}.\n`;
       });
-      const h = hw(B.hrs);
-      ar += `الحجز سيصبح غير قابل للتعديل قبل موعد الإقلاع بـ ${h.ar}.`;
-      en += `This booking will become non-changeable ${h.en} before departure.`;
-      return {ar, en};
+      return {ar: ar.replace(/\n$/,''), en: en.replace(/\n$/,'')};
     });
     bkAr = blocks.map(b=>b.ar).join('\n\n──────────\n\n') + '\n\n';
     bkEn = blocks.map(b=>b.en).join('\n\n──────────\n\n') + '\n\n';
   }
-  const msgArLcc = d.bk ? (flHeaderAr + paxHeaderAr + lccNoteAr + bkAr +
-    `إجمالي مبلغ التعديل المطلوب: ${fmtAmt(d.grand, pocCur)} ${curAr}.\n\n` +
-    `مع العلم أن السعر والإمكانية غير ثابتين.`) : null;
-  const msgEnLcc = d.bk ? (flHeaderEn + paxHeaderEn + lccNoteEn + bkEn +
-    `Total amendment amount: ${fmtAmt(d.grand, pocCur)} ${pocCur}.\n\n` +
-    `Knowing that the price and availability are not guaranteed.`) : null;
+  const pfMosAr = d.pf ? (mosFeeTextAr + '\n\n') : '', pfMosEn = d.pf ? (mosFeeTextEn + '\n\n') : '';
+  const _hwB = h => { const n = parseFloat(h) || 0; return {ar:`${h} ${hrWordAr(n)}`, en:`${h} ${hrWordEn(n)}`}; };
+  const _nsSame = !!d.bk && d.bk.every(B => String(B.hrs) === String(d.bk[0].hrs));
+  const nsLinesAr = d.bk ? (_nsSame ? `الحجز سيصبح غير قابل للتعديل قبل موعد الإقلاع بـ ${_hwB(d.bk[0].hrs).ar}.` : d.bk.map(B => `${B.dir==='out'?'الذهاب':'العودة'}: الحجز سيصبح غير قابل للتعديل قبل موعد الإقلاع بـ ${_hwB(B.hrs).ar}.`).join('\n')) : '';
+  const nsLinesEn = d.bk ? (_nsSame ? `Your booking will become non-changeable ${_hwB(d.bk[0].hrs).en} before the departure time.` : d.bk.map(B => `${B.dir==='out'?'Outbound':'Return'}: Your booking will become non-changeable ${_hwB(B.hrs).en} before the departure time.`).join('\n')) : '';
+  const payAr = d.lccMix ? '\nهل ترغب في إرسال رابط الدفع الآن لإتمام العملية؟ (يرجى العلم أن صلاحية الرابط 10 دقائق فقط).' : '';
+  const payEn = d.lccMix ? '\nWould you like us to send the payment link now to complete the process? (Please note that the link is valid for 10 minutes only).' : '';
+  const msgArLcc = d.bk ? (flHeaderAr + (d.pf ? '' : paxHeaderAr) + lccNoteAr + bkAr + pfMosAr +
+    `إجمالي مبلغ التعديل المطلوب: ${fmtAmt(d.grand, pocCur)} ${curAr}.\n` +
+    nsLinesAr + `\nمع العلم أن السعر والإمكانية غير ثابتين.` + payAr) : null;
+  const msgEnLcc = d.bk ? (flHeaderEn + (d.pf ? '' : paxHeaderEn) + lccNoteEn + bkEn + pfMosEn +
+    `Total amendment amount: ${fmtAmt(d.grand, pocCur)} ${pocCur}.\n` +
+    nsLinesEn + `\nKnowing that the price and availability are not guaranteed.` + payEn) : null;
   const msgAr =
     flHeaderAr +
     paxHeaderAr +
@@ -3278,18 +3553,19 @@ function processAll(){
     const partsAr=[], partsEn=[];
     let k=0;
     d.bk.forEach(B=>{
-      const sg=B.t==='LCC'?lccS:gdsS;
+      const sg=d.pf?pfLegSegs(B.dir):(B.t==='LCC'?lccS:gdsS);
       const dirAr=B.dir==='out'?'الذهاب':'العودة', dirEn=B.dir==='out'?'Outbound':'Return';
       const base=k;
       const tx=(arr,fa)=>arr.map((s,i)=>{ const gi=base+i; return `*${fa?'الرحلة':'Flight'} ${gi+1}*\n`+(fa?buildFlightTextAr(s)+bagLnAr(gi):buildFlightTextEn(s)+bagLnEn(gi)); }).join('\n\n');
       const ta=tx(sg,true), te=tx(sg,false); k+=sg.length;
-      partsAr.push(`*${dirAr} (${bookingAirlineName(B.t,'ar')})*\n${ta}\nإجمالي هذا الحجز: ${_pfmt(B.total)} ${curAr}\nالحجز سيصبح غير قابل للتعديل قبل موعد الإقلاع بـ ${hwA(B.hrs)}.`);
-      partsEn.push(`*${dirEn} (${bookingAirlineName(B.t,'en')})*\n${te}\nBooking total: ${_pfmt(B.total)} ${d.currency}\nThis booking will become non-changeable ${hwE(B.hrs)} before departure.`);
+      const pxA=d.pf?pfPaxLine(B.cnt,'ar'):'', pxE=d.pf?pfPaxLine(B.cnt,'en'):'';
+      partsAr.push(`*${dirAr} (${bkAirName(B,'ar')})*\n${pxA}${ta}\nإجمالي هذا الحجز: ${_pfmt(B.total)} ${curAr}\nالحجز سيصبح غير قابل للتعديل قبل موعد الإقلاع بـ ${hwA(B.hrs)}.`);
+      partsEn.push(`*${dirEn} (${bkAirName(B,'en')})*\n${pxE}${te}\nBooking total: ${_pfmt(B.total)} ${d.currency}\nThis booking will become non-changeable ${hwE(B.hrs)} before departure.`);
     });
     flAr2=partsAr.join('\n\n──────────\n\n'); flEn2=partsEn.join('\n\n──────────\n\n');
   }
-  document.getElementById('confirmAr').innerText=`للتأكيد فقط، هذه هى الرحلة المطلوبة صحيح؟\n\n${paxArLabel}\n${paxCountAr}\n\n${flAr2}\n\nإجمالي المطلوب: ${_pfmt(d.grand)} ${curAr}\n\n${note}`;
-  document.getElementById('confirmEn').innerText=`Just to confirm, this is the requested flight, correct?\n\n${paxEnLabel}\n${paxCountEn}\n\n${flEn2}\n\nTotal Fees: ${_pfmt(d.grand)} ${d.currency}\n\n${noteEn}`;
+  document.getElementById('confirmAr').innerText=`للتأكيد فقط، هذه هى الرحلة المطلوبة صحيح؟\n\n${paxArLabel}\n${d.pf?'':paxCountAr+'\n'}\n${flAr2}\n\nإجمالي المطلوب: ${_pfmt(d.grand)} ${curAr}\n\n${note}`;
+  document.getElementById('confirmEn').innerText=`Just to confirm, this is the requested flight, correct?\n\n${paxEnLabel}\n${d.pf?'':paxCountEn+'\n'}\n${flEn2}\n\nTotal Fees: ${_pfmt(d.grand)} ${d.currency}\n\n${noteEn}`;
 }
 
 function copyGdsNote(){
@@ -3329,6 +3605,14 @@ function validateBeforeAnalyze(){
   }
   if(_multiBooking){
     const maskA2=document.getElementById('maskA2');
+    if(_secondType==='lcc'){
+      const la=document.getElementById('lccAmt');
+      if(la && la.value.trim()===''){
+        la.classList.add('alert-red-input'); ok=false;
+        la.addEventListener('input',()=>{la.classList.remove('alert-red-input');},{once:true});
+        if(typeof storageToast==='function') storageToast(uiLang==='ar'?'⚠️ أدخل إجمالي رسوم الـ LCC (اكتب 0 لو مفيش)':'⚠️ Enter the LCC total (enter 0 if none)');
+      }
+    }
     if(_secondType!=='lcc' && maskA2 && !maskA2.value.trim()){
       maskA2.classList.add('alert-red-input');
       ok=false;
@@ -3408,6 +3692,7 @@ function draftSave() {
     mask, maskC, maskI, seg, rawSegPost,
     maskA2, maskC2, maskI2, multiBooking, secondType:_secondType, lccAmt:document.getElementById('lccAmt')?.value||'', lccLeg:document.getElementById('lccLeg')?.value||'ret', lccFlights:document.getElementById('lccFlights')?.value||'', lccVat:!!document.getElementById('lccVat')?.checked,
     cA, cC, cI, bHand, bCheck,
+    flightCfg:(typeof _flightCfg!=='undefined')?_flightCfg:null,
     paxNamesRaw, parsedNames,
     computedD, maskCurSaved, pocCurSaved, fxRateSaved,
     selFlightType, maskAirCode, maskFlightType,
@@ -3463,6 +3748,7 @@ function draftRestore() {
   if (draft.cA !== undefined) { const el = document.getElementById('cA'); if(el) el.value = draft.cA; }
   if (draft.cC !== undefined) { const el = document.getElementById('cC'); if(el) el.value = draft.cC; }
   if (draft.cI !== undefined) { const el = document.getElementById('cI'); if(el) el.value = draft.cI; }
+  if (draft.flightCfg) _flightCfg = draft.flightCfg;
   if (draft.maskAirCode)    _maskAirlineCode    = draft.maskAirCode;
   if (draft.maskFlightType) _maskFlightType     = draft.maskFlightType;
   if (draft.selFlightType)  _selectedFlightType = draft.selFlightType;
